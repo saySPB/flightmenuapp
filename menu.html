@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Меню — Бизнес-класс</title>
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="menu.css">
+    <link rel="stylesheet" href="css/menu.css">
 </head>
 <body>
     <div class="header">
@@ -53,6 +53,24 @@
             document.body.classList.add('light-theme');
         }
 
+        function getPassengerName(seat) {
+            const savedMenu = JSON.parse(localStorage.getItem(`menu_${seat}`)) || {};
+            return savedMenu.passengerName || '';
+        }
+
+        function savePassengerName(input, seat) {
+            const name = input.value.trim();
+            const savedMenu = JSON.parse(localStorage.getItem(`menu_${seat}`)) || {};
+            savedMenu.passengerName = name;
+            localStorage.setItem(`menu_${seat}`, JSON.stringify(savedMenu));
+            
+            // Visual feedback
+            input.style.borderColor = 'var(--accent-color)';
+            setTimeout(() => {
+                input.style.borderColor = 'var(--border-color)';
+            }, 1000);
+        }
+
         function goBackToIndex() {
             window.location.href = 'index.html';
         }
@@ -89,7 +107,17 @@
             currentSeats.forEach((seat, index) => {
                 const targetContainer = index === 0 ? menuSeat1 : menuSeat2;
                 if (index === 1) menuSeat2.style.display = 'block';
-                targetContainer.innerHTML = `<h3>Место: <span contenteditable="true" data-seat="${seat}">${seat}</span></h3>`;
+                targetContainer.innerHTML = `
+                    <h3>Место: <span contenteditable="true" data-seat="${seat}">${seat}</span></h3>
+                    <div class="passenger-name-container">
+                        <label for="passenger-name-${seat}">Имя пассажира:</label>
+                        <input type="text" class="passenger-name" id="passenger-name-${seat}" 
+                               placeholder="Введите имя пассажира" 
+                               value="${getPassengerName(seat)}"
+                               onchange="savePassengerName(this, '${seat}')"
+                               aria-label="Имя пассажира для места ${seat}">
+                    </div>
+                `;
 
                 if (Object.keys(cycleData.sections).length === 0) {
                     targetContainer.innerHTML += '<p>Меню пустое. Настройте его через редактор.</p>';
@@ -139,14 +167,12 @@
                 const sectionName = item.getAttribute('data-section');
                 const subitemLabels = item.querySelectorAll('.subitem-label');
 
-                // Обработчик для клика по label (включает переключение при клике на текст)
                 mainLabel.addEventListener('click', (e) => {
                     if (e.target.tagName !== 'INPUT') {
                         e.preventDefault();
                         mainCheckbox.checked = !mainCheckbox.checked;
                         updateCheckbox(mainCheckbox, itemName, seat, sectionName);
                     }
-                    // Если клик был на чекбокс, он уже сработает через onchange, ничего не блокируем
                 });
 
                 subitemLabels.forEach(label => {
@@ -251,6 +277,8 @@
         function saveChanges() {
             currentSeats.forEach((seat, index) => {
                 const menuData = {};
+                const passengerName = document.getElementById(`passenger-name-${seat}`)?.value || '';
+
                 document.querySelectorAll(`.menu-item-container[data-seat="${seat}"]`).forEach(container => {
                     const itemName = container.getAttribute('data-item');
                     const sectionName = container.getAttribute('data-section');
@@ -265,6 +293,11 @@
                         };
                     }
                 });
+
+                if (passengerName) {
+                    menuData.passengerName = passengerName;
+                }
+
                 localStorage.setItem(`menu_${seat}`, JSON.stringify(menuData));
 
                 let savedSeats = JSON.parse(localStorage.getItem('savedSeats')) || [];
@@ -377,5 +410,3 @@
         renderTabs();
         updateMenu();
     </script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'92a8baff5960bd62',t:'MTc0MzY4NTAzMi4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
-</html>

@@ -120,6 +120,8 @@ h1 {
     border-bottom: 2px solid var(--accent-color);
     padding-bottom: 10px;
     margin-bottom: 20px;
+    display: flex;
+    align-items: center;
 }
 
 .menu-seat h4 {
@@ -127,6 +129,10 @@ h1 {
     font-size: 1.4em;
     margin: 20px 0 10px;
     padding: 0;
+}
+
+.menu-item-container {
+    position: relative;
 }
 
 .menu-item-container label {
@@ -142,6 +148,30 @@ h1 {
 .menu-item-container label:hover {
     background: #3e5a74;
     transform: translateX(5px);
+}
+
+.info-icon {
+    display: inline-block;
+    margin-left: 5px;
+    font-size: 14px;
+    color: var(--accent-color);
+    cursor: pointer;
+    position: relative;
+}
+
+.tooltip {
+    display: none;
+    position: absolute;
+    top: -40px;
+    right: 0;
+    background-color: var(--card-bg);
+    color: var(--text-color);
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    z-index: 1000;
+    max-width: 200px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
 
 input[type="checkbox"] {
@@ -283,4 +313,71 @@ input[type="checkbox"] {
 .settings-button:hover {
     background: #37474f;
     transform: scale(1.1);
+}
+
+/* Стили для контейнера имени пассажира */
+.passenger-name-container {
+    margin: 10px 0;
+    padding: 10px;
+    background: var(--card-bg);
+    border-radius: 6px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    display: flex;
+    align-items: center;
+    transition: transform 0.3s ease, background 0.3s ease;
+}
+
+.passenger-name-container:hover {
+    transform: translateY(-2px);
+    background: var(--item-bg);
+}
+
+.passenger-name-container label {
+    margin-right: 10px;
+    font-weight: 600;
+    color: var(--text-color);
+    font-family: 'Open Sans', sans-serif;
+    white-space: nowrap;
+}
+
+/* Стили для поля ввода имени пассажира */
+.passenger-name {
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--item-bg);
+    color: var(--text-color);
+    width: 200px;
+    font-family: 'Open Sans', sans-serif;
+    transition: all 0.3s ease;
+    font-size: 1em;
+}
+
+.passenger-name:focus {
+    border-color: var(--accent-color);
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.3);
+}
+
+/* Адаптивные стили */
+@media (max-width: 768px) {
+    .menu-container {
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .menu-seat {
+        width: 90%;
+        margin-bottom: 20px;
+    }
+    
+    .passenger-name-container {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .passenger-name {
+        width: 100%;
+        margin-top: 5px;
+    }
 }

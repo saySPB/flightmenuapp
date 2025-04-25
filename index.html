@@ -6,7 +6,7 @@
     <title>Управление местами — Бизнес-класс</title>
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <link rel="stylesheet" href="index.css">
+    <link rel="stylesheet" href="css/index.css">
 </head>
 <body>
     <h1>Управление местами — Бизнес-класс</h1>
@@ -78,7 +78,6 @@
         let seatCounter = 0;
         let useLetters = true;
 
-        // Загрузка сохраненной темы
         if (localStorage.getItem('theme') === 'light') {
             document.body.classList.add('light-theme');
             themeToggle.textContent = '☀️';
@@ -86,7 +85,6 @@
             themeToggle.textContent = '🌙';
         }
 
-        // Функция переключения темы
         function toggleTheme() {
             document.body.classList.toggle('light-theme');
             const isLight = document.body.classList.contains('light-theme');
@@ -101,10 +99,11 @@
 
             savedSeats.forEach(seat => {
                 const savedMenu = JSON.parse(localStorage.getItem(`menu_${seat}`)) || {};
-                const hasOrder = Object.values(savedMenu).some(item => item.checked);
+                const hasOrder = Object.keys(savedMenu).some(key => key !== 'passengerName' && savedMenu[key]?.checked);
+                const passengerName = savedMenu.passengerName ? ` (${savedMenu.passengerName})` : '';
                 const seatElement = document.createElement('div');
                 seatElement.setAttribute('data-seat', seat);
-                seatElement.textContent = seat + (hasOrder ? ' (Сохранено)' : '');
+                seatElement.textContent = seat + (hasOrder ? ' (Сохранено)' : '') + passengerName;
 
                 if (selectedSeats.includes(seat)) {
                     seatElement.className = 'seat selected-seat';
@@ -124,9 +123,10 @@
                 const savedMenu = JSON.parse(localStorage.getItem(`menu_${seat}`)) || {};
                 let hasItems = false;
                 let sections = {};
+                const passengerName = savedMenu.passengerName ? ` (${savedMenu.passengerName})` : '';
 
                 Object.keys(savedMenu).forEach(item => {
-                    if (savedMenu[item].checked) {
+                    if (item !== 'passengerName' && savedMenu[item]?.checked) {
                         hasItems = true;
                         const section = savedMenu[item].section || 'Без раздела';
                         if (!sections[section]) sections[section] = [];
@@ -141,7 +141,7 @@
 
                 if (hasItems) {
                     const listItem = document.createElement('li');
-                    let orderDetails = `<strong>Место ${seat}:</strong><br>`;
+                    let orderDetails = `<strong>Место ${seat}${passengerName}:</strong><br>`;
                     Object.keys(sections).forEach(section => {
                         orderDetails += `<strong>${section}:</strong><br>${sections[section].join('<br>')}<br>`;
                     });
@@ -165,9 +165,10 @@
                 const savedMenu = JSON.parse(localStorage.getItem(`menu_${seat}`)) || {};
                 let hasItems = false;
                 let sections = {};
+                const passengerName = savedMenu.passengerName ? ` (${savedMenu.passengerName})` : '';
 
                 Object.keys(savedMenu).forEach(item => {
-                    if (savedMenu[item].checked) {
+                    if (item !== 'passengerName' && savedMenu[item]?.checked) {
                         hasItems = true;
                         const section = savedMenu[item].section || 'Без раздела';
                         if (!sections[section]) sections[section] = [];
@@ -181,7 +182,7 @@
                 });
 
                 if (hasItems) {
-                    ordersText += `Место ${seat}:\n`;
+                    ordersText += `Место ${seat}${passengerName}:\n`;
                     Object.keys(sections).forEach(section => {
                         ordersText += `${section}:\n${sections[section].join('\n')}\n`;
                     });
@@ -205,7 +206,11 @@
                 const selectedSeat = document.createElement('div');
                 selectedSeat.className = 'seat selected-seat';
                 selectedSeat.setAttribute('data-seat', seatNumber);
-                selectedSeat.textContent = seatNumber;
+                
+                const savedMenu = JSON.parse(localStorage.getItem(`menu_${seatNumber}`)) || {};
+                const passengerName = savedMenu.passengerName ? ` (${savedMenu.passengerName})` : '';
+                selectedSeat.textContent = seatNumber + passengerName;
+                
                 rightColumn.appendChild(selectedSeat);
                 seat.remove();
                 selectedSeats.push(seatNumber);
@@ -213,13 +218,19 @@
                 const originalSeat = document.createElement('div');
                 originalSeat.className = 'seat';
                 originalSeat.setAttribute('data-seat', seatNumber);
-                originalSeat.textContent = seatNumber;
+                
                 const savedMenu = JSON.parse(localStorage.getItem(`menu_${seatNumber}`)) || {};
-                const hasOrder = Object.values(savedMenu).some(item => item.checked);
+                const hasOrder = Object.keys(savedMenu).some(key => key !== 'passengerName' && savedMenu[key]?.checked);
+                const passengerName = savedMenu.passengerName ? ` (${savedMenu.passengerName})` : '';
+                originalSeat.textContent = seatNumber;
+                
                 if (hasOrder) {
                     originalSeat.classList.add('saved-seat');
-                    originalSeat.textContent += ' (Сохранено)';
+                    originalSeat.textContent += ' (Сохранено)' + passengerName;
+                } else {
+                    originalSeat.textContent += passengerName;
                 }
+                
                 leftColumn.appendChild(originalSeat);
                 seat.remove();
                 selectedSeats = selectedSeats.filter(s => s !== seatNumber);
@@ -309,9 +320,7 @@
             const end = endSeatInput.value.trim();
             const newUseLetters = useLettersCheckbox.checked;
 
-            // Проверка корректности введенных данных
             if ((newUseLetters && letters.length > 0 && !isNaN(row) && end) || (!newUseLetters && !isNaN(row) && end)) {
-                // Проверяем, изменились ли настройки
                 const settingsChanged = 
                     JSON.stringify(letters) !== JSON.stringify(seatLetters) ||
                     row !== startRow ||
@@ -320,7 +329,6 @@
 
                 if (settingsChanged) {
                     if (confirm('Изменение настроек приведет к сбросу всех добавленных мест. Продолжить?')) {
-                        // Сбрасываем все сохраненные данные о местах
                         const savedSeats = JSON.parse(localStorage.getItem('savedSeats')) || [];
                         savedSeats.forEach(seat => {
                             localStorage.removeItem(`menu_${seat}`);
@@ -328,7 +336,6 @@
                         localStorage.removeItem('savedSeats');
                         localStorage.removeItem('selectedSeats');
 
-                        // Обновляем глобальные переменные
                         seatLetters = newUseLetters ? letters : [];
                         startRow = row;
                         endSeat = end;
@@ -336,12 +343,10 @@
                         seatCounter = 0;
                         selectedSeats = [];
 
-                        // Очищаем интерфейс
                         leftColumn.innerHTML = '';
                         rightColumn.innerHTML = '';
                     }
                 } else {
-                    // Если настройки не изменились, просто закрываем модальное окно
                     closeSettingsModal();
                     return;
                 }
@@ -359,7 +364,6 @@
             const url = 'https://raw.githubusercontent.com/saySPB/myFlightmenu/main/Лист%20Microsoft%20Excel.xlsx';
             try {
                 const response = await fetch(url);
-                console.log('Статус ответа (openFlightModal):', response.status, response.statusText);
                 if (!response.ok) throw new Error(`Ошибка HTTP: ${response.status}`);
                 const arrayBuffer = await response.arrayBuffer();
                 const workbook = XLSX.read(arrayBuffer, { type: 'array' });
@@ -391,7 +395,6 @@
             const url = 'https://raw.githubusercontent.com/saySPB/myFlightmenu/main/Лист%20Microsoft%20Excel.xlsx';
             try {
                 const response = await fetch(url);
-                console.log('Статус ответа (loadMenuFromGitHub):', response.status, response.statusText);
                 if (!response.ok) throw new Error(`Ошибка HTTP: ${response.status}`);
                 const arrayBuffer = await response.arrayBuffer();
                 const workbook = XLSX.read(arrayBuffer, { type: 'array' });
