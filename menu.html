@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Меню — Бизнес-класс</title>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="menu.css">
+</head>
+<body>
+    <div class="header">
+        <button class="back-button btn" onclick="goBackToIndex()">🡨</button>
+        <h1>Меню — Бизнес-класс</h1>
+        <button class="settings-button btn" onclick="openSettingsModal()">⚙️</button>
+    </div>
+    <div class="tabs" id="cycle-tabs"></div>
+    <div class="menu-container" id="menu-container">
+        <div class="menu-seat" id="menu-seat-1"></div>
+        <div class="menu-seat" id="menu-seat-2" style="display: none;"></div>
+    </div>
+    <div class="buttons">
+        <button class="save-button btn" id="save-button" onclick="saveChanges()">Сохранить</button>
+    </div>
+
+    <div class="modal" id="settings-modal" style="display: none;">
+        <h3>Редактор меню</h3>
+        <div id="editor-sections"></div>
+        <h4>Общие подпункты</h4>
+        <div id="global-subitems"></div>
+        <button class="btn" onclick="addSection()">Добавить раздел</button>
+        <button class="btn" onclick="addGlobalSubItem()">+ Добавить подпункт</button>
+        <button class="btn" onclick="saveMenuSettings()">Сохранить настройки</button>
+        <button class="btn modal-button close-button" onclick="closeSettingsModal()">Закрыть</button>
+    </div>
+
+    <script>
+        const menuContainer = document.getElementById('menu-container');
+        const menuSeat1 = document.getElementById('menu-seat-1');
+        const menuSeat2 = document.getElementById('menu-seat-2');
+        const cycleTabs = document.getElementById('cycle-tabs');
+        const editorSections = document.getElementById('editor-sections');
+        const globalSubItemsContainer = document.getElementById('global-subitems');
+        const currentSeats = JSON.parse(localStorage.getItem('currentSeats')) || [];
+        const menuData = JSON.parse(localStorage.getItem('menuData')) || {};
+        const cycles = JSON.parse(localStorage.getItem('cycles')) || [];
+        let selectedCycle = cycles[0] || '';
+        let savedMenus = currentSeats.map(seat => ({
+            seat,
+            data: JSON.parse(localStorage.getItem(`menu_${seat}`)) || {}
+        }));
+
+        if (localStorage.getItem('theme') === 'light') {
+            document.body.classList.add('light-theme');
+        }
+
+        function goBackToIndex() {
+            window.location.href = 'index.html';
+        }
+
+        function renderTabs() {
+            cycleTabs.innerHTML = '';
+            if (cycles.length === 0) {
+                cycleTabs.innerHTML = '<p>Нет доступных циклов. Подгрузите меню в настройках.</p>';
+                return;
+            }
+            cycles.forEach(cycle => {
+                const tab = document.createElement('div');
+                tab.className = `tab ${cycle === selectedCycle ? 'active' : ''}`;
+                tab.textContent = cycle;
+                tab.onclick = () => {
+                    selectedCycle = cycle;
+                    updateTabs();
+                    updateMenu();
+                };
+                cycleTabs.appendChild(tab);
+            });
+        }
+
+        function updateTabs() {
+            const tabs = document.querySelectorAll('.tab');
+            tabs.forEach(tab => {
+                tab.classList.toggle('active', tab.textContent === selectedCycle);
+            });
+        }
+
+        function updateMenu() {
+            const cycleData = menuData[selectedCycle] || { sections: {}, subitems: {} };
+
+            currentSeats.forEach((seat, index) => {
+                const targetContainer = index === 0 ? menuSeat1 : menuSeat2;
+                if (index === 1) menuSeat2.style.display = 'block';
+                targetContainer.innerHTML = `<h3>Место: <span contenteditable="true" data-seat="${seat}">${seat}</span></h3>`;
+
+                if (Object.keys(cycleData.sections).length === 0) {
+                    targetContainer.innerHTML += '<p>Меню пустое. Настройте его через редактор.</p>';
+                    return;
+                }
+
+                Object.keys(cycleData.sections).forEach(sectionName => {
+                    targetContainer.innerHTML += `<h4>${sectionName}</h4>`;
+                    cycleData.sections[sectionName].forEach(item => {
+                        const isChecked = savedMenus[index].data[item]?.checked ? 'checked' : '';
+                        const selectedSubitems = savedMenus[index].data[item]?.subitems || [];
+                        const itemSubitems = cycleData.subitems[item] || [];
+                        targetContainer.innerHTML += `
+                            <div class="menu-item-container" data-item="${item}" data-seat="${seat}" data-section="${sectionName}">
+                                <label class="main-label">
+                                    <input type="checkbox" ${isChecked} onchange="updateCheckbox(this, '${item}', '${seat}', '${sectionName}')">
+                                    <span class="item-text">${item}</span>
+                                </label>
+                                <div class="subitems">
+                                    ${itemSubitems.map(sub => `
+                                        <label class="subitem-label">
+                                            <input type="checkbox" ${selectedSubitems.includes(sub) ? 'checked' : ''} onchange="toggleSubitem(this, '${item}', '${sub}', '${seat}', '${sectionName}')">
+                                            ${sub}
+                                        </label>
+                                    `).join('')}
+                                    <input type="text" placeholder="Добавить свой вариант" onkeypress="if(event.key === 'Enter') addCustomSubitem(this, '${item}', '${seat}', '${sectionName}')">
+                                </div>
+                                <div class="selected-subitems">${selectedSubitems.map(sub => `<div>${sub}</div>`).join('')}</div>
+                            </div>
+                        `;
+                    });
+                });
+            });
+
+            attachEventListeners();
+        }
+
+        function attachEventListeners() {
+            const items = document.querySelectorAll('.menu-item-container');
+            let holdTimer;
+
+            items.forEach(item => {
+                const mainLabel = item.querySelector('.main-label');
+                const mainCheckbox = mainLabel.querySelector('input[type="checkbox"]');
+                const itemName = item.getAttribute('data-item');
+                const seat = item.getAttribute('data-seat');
+                const sectionName = item.getAttribute('data-section');
+                const subitemLabels = item.querySelectorAll('.subitem-label');
+
+                // Обработчик для клика по label (включает переключение при клике на текст)
+                mainLabel.addEventListener('click', (e) => {
+                    if (e.target.tagName !== 'INPUT') {
+                        e.preventDefault();
+                        mainCheckbox.checked = !mainCheckbox.checked;
+                        updateCheckbox(mainCheckbox, itemName, seat, sectionName);
+                    }
+                    // Если клик был на чекбокс, он уже сработает через onchange, ничего не блокируем
+                });
+
+                subitemLabels.forEach(label => {
+                    const subCheckbox = label.querySelector('input[type="checkbox"]');
+                    const subitemText = label.textContent.trim();
+                    label.addEventListener('click', (e) => {
+                        if (e.target.tagName !== 'INPUT') {
+                            e.preventDefault();
+                            subCheckbox.checked = !subCheckbox.checked;
+                            toggleSubitem(subCheckbox, itemName, subitemText, seat, sectionName);
+                        }
+                    });
+                });
+
+                mainLabel.addEventListener('touchstart', (e) => {
+                    holdTimer = setTimeout(() => {
+                        item.classList.toggle('active');
+                    }, 500);
+                });
+
+                mainLabel.addEventListener('touchend', () => {
+                    clearTimeout(holdTimer);
+                });
+
+                mainLabel.addEventListener('touchcancel', () => {
+                    clearTimeout(holdTimer);
+                });
+
+                mainLabel.addEventListener('mousedown', (e) => {
+                    holdTimer = setTimeout(() => {
+                        item.classList.toggle('active');
+                    }, 500);
+                });
+
+                mainLabel.addEventListener('mouseup', () => {
+                    clearTimeout(holdTimer);
+                });
+
+                mainLabel.addEventListener('mouseleave', () => {
+                    clearTimeout(holdTimer);
+                });
+
+                document.addEventListener('click', (e) => {
+                    if (!item.contains(e.target) && item.classList.contains('active')) {
+                        item.classList.remove('active');
+                    }
+                });
+            });
+        }
+
+        function updateCheckbox(checkbox, itemName, currentSeat, sectionName) {
+            const menuData = savedMenus.find(menu => menu.seat === currentSeat).data;
+            menuData[itemName] = menuData[itemName] || { subitems: [], section: sectionName };
+            menuData[itemName].checked = checkbox.checked;
+            if (!checkbox.checked) {
+                menuData[itemName].subitems = [];
+                const container = checkbox.closest('.menu-item-container');
+                container.querySelector('.selected-subitems').innerHTML = '';
+            }
+        }
+
+        function toggleSubitem(checkbox, itemName, subitemText, currentSeat, sectionName) {
+            const container = checkbox.closest('.menu-item-container');
+            const selectedSubitemsDiv = container.querySelector('.selected-subitems');
+            const menuData = savedMenus.find(menu => menu.seat === currentSeat).data;
+            menuData[itemName] = menuData[itemName] || { subitems: [], section: sectionName };
+
+            if (checkbox.checked) {
+                if (!menuData[itemName].subitems.includes(subitemText)) {
+                    menuData[itemName].subitems.push(subitemText);
+                }
+            } else {
+                menuData[itemName].subitems = menuData[itemName].subitems.filter(sub => sub !== subitemText);
+            }
+            selectedSubitemsDiv.innerHTML = menuData[itemName].subitems.map(sub => `<div>${sub}</div>`).join('');
+        }
+
+        function addCustomSubitem(input, itemName, currentSeat, sectionName) {
+            const subitemText = input.value.trim();
+            if (subitemText) {
+                const container = input.closest('.menu-item-container');
+                const selectedSubitemsDiv = container.querySelector('.selected-subitems');
+                const menuData = savedMenus.find(menu => menu.seat === currentSeat).data;
+                menuData[itemName] = menuData[itemName] || { subitems: [], section: sectionName };
+
+                if (!menuData[itemName].subitems.includes(subitemText)) {
+                    menuData[itemName].subitems.push(subitemText);
+                    selectedSubitemsDiv.innerHTML = menuData[itemName].subitems.map(sub => `<div>${sub}</div>`).join('');
+
+                    const cycleData = menuData[selectedCycle] || { sections: {}, subitems: {} };
+                    if (!cycleData.subitems[itemName]) cycleData.subitems[itemName] = [];
+                    if (!cycleData.subitems[itemName].includes(subitemText)) {
+                        cycleData.subitems[itemName].push(subitemText);
+                        menuData[selectedCycle] = cycleData;
+                        localStorage.setItem('menuData', JSON.stringify(menuData));
+                    }
+                }
+                input.value = '';
+            }
+        }
+
+        function saveChanges() {
+            currentSeats.forEach((seat, index) => {
+                const menuData = {};
+                document.querySelectorAll(`.menu-item-container[data-seat="${seat}"]`).forEach(container => {
+                    const itemName = container.getAttribute('data-item');
+                    const sectionName = container.getAttribute('data-section');
+                    const checkbox = container.querySelector('.main-label input');
+                    const selectedSubitems = Array.from(container.querySelectorAll('.selected-subitems div')).map(div => div.textContent);
+                    if (checkbox.checked || selectedSubitems.length > 0) {
+                        menuData[itemName] = {
+                            checked: checkbox.checked,
+                            subitems: selectedSubitems,
+                            section: sectionName,
+                            cycle: selectedCycle
+                        };
+                    }
+                });
+                localStorage.setItem(`menu_${seat}`, JSON.stringify(menuData));
+
+                let savedSeats = JSON.parse(localStorage.getItem('savedSeats')) || [];
+                if (!savedSeats.includes(seat)) {
+                    savedSeats.push(seat);
+                    localStorage.setItem('savedSeats', JSON.stringify(savedSeats));
+                }
+
+                let selectedSeats = JSON.parse(localStorage.getItem('selectedSeats')) || [];
+                selectedSeats = selectedSeats.filter(s => s !== seat);
+                localStorage.setItem('selectedSeats', JSON.stringify(selectedSeats));
+            });
+
+            alert('Изменения сохранены для всех выбранных мест!');
+            window.location.href = 'index.html';
+        }
+
+        function openSettingsModal() {
+            document.getElementById('settings-modal').style.display = 'block';
+            loadEditorSections();
+        }
+
+        function closeSettingsModal() {
+            document.getElementById('settings-modal').style.display = 'none';
+        }
+
+        function addSection() {
+            const sectionId = `section-${Date.now()}`;
+            editorSections.insertAdjacentHTML('beforeend', `
+                <div class="editor-section" id="${sectionId}">
+                    <input type="text" placeholder="Название раздела" id="${sectionId}-name">
+                    <div id="${sectionId}-items"></div>
+                    <button class="btn" onclick="addItem('${sectionId}')">+ Добавить пункт</button>
+                    <button class="btn" onclick="document.getElementById('${sectionId}').remove()">- Удалить раздел</button>
+                </div>
+            `);
+        }
+
+        function addItem(sectionId) {
+            const itemId = `item-${Date.now()}`;
+            document.getElementById(`${sectionId}-items`).insertAdjacentHTML('beforeend', `
+                <div class="menu-item" id="${itemId}">
+                    <input type="text" placeholder="Название пункта" id="${itemId}-name">
+                    <button class="btn" onclick="document.getElementById('${itemId}').remove()">- Удалить</button>
+                </div>
+            `);
+        }
+
+        function addGlobalSubItem() {
+            const subItemId = `subitem-${Date.now()}`;
+            globalSubItemsContainer.insertAdjacentHTML('beforeend', `
+                <div class="global-subitem" id="${subItemId}">
+                    <input type="text" placeholder="Название подпункта" id="${subItemId}-name">
+                    <button class="btn" onclick="document.getElementById('${subItemId}').remove()">- Удалить</button>
+                </div>
+            `);
+        }
+
+        function loadEditorSections() {
+            const cycleData = menuData[selectedCycle] || { sections: {}, subitems: {} };
+            editorSections.innerHTML = '';
+            globalSubItemsContainer.innerHTML = '';
+
+            Object.keys(cycleData.sections).forEach((sectionName, index) => {
+                const sectionId = `section-${Date.now()}-${index}`;
+                editorSections.insertAdjacentHTML('beforeend', `
+                    <div class="editor-section" id="${sectionId}">
+                        <input type="text" value="${sectionName}" id="${sectionId}-name">
+                        <div id="${sectionId}-items"></div>
+                        <button class="btn" onclick="addItem('${sectionId}')">+ Добавить пункт</button>
+                        <button class="btn" onclick="document.getElementById('${sectionId}').remove()">- Удалить раздел</button>
+                    </div>
+                `);
+                cycleData.sections[sectionName].forEach(item => {
+                    const itemId = `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                    document.getElementById(`${sectionId}-items`).insertAdjacentHTML('beforeend', `
+                        <div class="menu-item" id="${itemId}">
+                            <input type="text" value="${item}" id="${itemId}-name">
+                            <button class="btn" onclick="document.getElementById('${itemId}').remove()">- Удалить</button>
+                        </div>
+                    `);
+                });
+            });
+
+            Object.values(cycleData.subitems).flat().forEach((subitem, index) => {
+                const subItemId = `subitem-${Date.now()}-${index}`;
+                globalSubItemsContainer.insertAdjacentHTML('beforeend', `
+                    <div class="global-subitem" id="${subItemId}">
+                        <input type="text" value="${subitem}" id="${subItemId}-name">
+                        <button class="btn" onclick="document.getElementById('${subItemId}').remove()">- Удалить</button>
+                    </div>
+                `);
+            });
+        }
+
+        function saveMenuSettings() {
+            const cycleData = menuData[selectedCycle] || { sections: {}, subitems: {} };
+            cycleData.sections = {};
+            document.querySelectorAll('.editor-section').forEach(section => {
+                const sectionName = section.querySelector('input').value;
+                const items = Array.from(section.querySelectorAll('.menu-item input')).map(input => input.value);
+                if (sectionName && items.length) cycleData.sections[sectionName] = items;
+            });
+            menuData[selectedCycle] = cycleData;
+            localStorage.setItem('menuData', JSON.stringify(menuData));
+            closeSettingsModal();
+            updateMenu();
+        }
+
+        renderTabs();
+        updateMenu();
+    </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'92a8baff5960bd62',t:'MTc0MzY4NTAzMi4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
